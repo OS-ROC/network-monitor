@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+
+<style>
+body {
+    background-image: url('https://images.unsplash.com/photo-1762199715541-a42f25f48ecf?q=80&w=1475&auto=format&fit=crop');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+}
+
+.logs-wrapper {
+    background-color: rgba(255,255,255,0.75);
+    backdrop-filter: blur(8px);
+    border-radius: 12px;
+    padding: 25px;
+}
+
+.table th { white-space: nowrap; }
+
+.pagination-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+}
+
+.page-numbers { display: flex; justify-content: center; align-items: center; gap: 5px; }
+.range-buttons { display:flex; gap:10px; }
+.range-buttons a { text-decoration:none; }
+</style>
+
+<div class="logs-wrapper">
+    <h2 class="mb-4">📄 系统日志</h2>
+
+    <!-- 时间区间选择 -->
+    <div class="range-buttons mb-2">
+        <a href="?range=1h&alert={{ filter_alert }}" class="btn btn-sm btn-outline-primary {% if current_range=='1h' %}active{% endif %}">最近 1 小时</a>
+        <a href="?range=24h&alert={{ filter_alert }}" class="btn btn-sm btn-outline-primary {% if current_range=='24h' %}active{% endif %}">最近 24 小时</a>
+        <a href="?range=7d&alert={{ filter_alert }}" class="btn btn-sm btn-outline-primary {% if current_range=='7d' %}active{% endif %}">最近 7 天</a>
+        <a href="?range=30d&alert={{ filter_alert }}" class="btn btn-sm btn-outline-primary {% if current_range=='30d' %}active{% endif %}">最近 30 天</a>
+    </div>
+
+    <!-- 告警筛选 -->
+    <div class="range-buttons mb-1">
+        <span>显示告警：</span>
+        <a href="?range={{ current_range }}&alert=all" class="btn btn-sm btn-outline-primary {% if filter_alert=='all' %}active{% endif %}">全部</a>
+        <a href="?range={{ current_range }}&alert=warning" class="btn btn-sm btn-outline-warning {% if filter_alert=='warning' %}active{% endif %}">警告</a>
+        <a href="?range={{ current_range }}&alert=critical" class="btn btn-sm btn-outline-danger {% if filter_alert=='critical' %}active{% endif %}">严重</a>
+    </div>
+
+    <div class="mb-3 text-end">
+        <a href="/logs/download?range={{ current_range }}&alert={{ filter_alert }}" class="btn btn-primary">⬇️ 下载日志 JSON</a>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover align-middle">
+            <thead class="table-light">
+                <tr>
+                    <th>ID</th>
+                    <th>IP / 主机</th>
+                    <th>延迟 (ms)</th>
+                    <th>丢包率 (%)</th>
+                    <th>HTTP 响应 (ms)</th>
+                    <th>告警</th>
+                    <th>记录时间</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr>
+                    <td>{{ log.id }}</td>
+                    <td>{{ log.host }}</td>
+                    <td>{{ log.latency_ms }}</td>
+                    <td>{{ log.packet_loss_percent }}</td>
+                    <td>{{ log.http_response_ms }}</td>
+                    <td class="{% if log.alert_info=='critical' %}text-danger
+                               {% elif log.alert_info=='warning' %}text-warning
+                               {% else %}text-success{% endif %}">
+                        {% if log.alert_info=='critical' %}严重{% elif log.alert_info=='warning' %}警告{% else %}正常{% endif %}
+                    </td>
+                    <td>{{ log.created_at.strftime("%Y-%m-%d %H:%M:%S") }}</td>
+                </tr>
+                {% endfor %}
+                {% if logs|length == 0 %}
+                <tr>
+                    <td colspan="7" class="text-center text-muted">暂无日志数据</td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- 分页 -->
+    <div class="pagination-wrapper">
+        <!-- 上一页 -->
+        <div>
+            <a class="btn btn-outline-secondary {% if current_page <= 1 %}disabled{% endif %}" href="?range={{ current_range }}&page={{ current_page - 1 }}&alert={{ filter_alert }}">上一页</a>
+        </div>
+
+        <!-- 页码 + 跳转 -->
+        <div class="page-numbers d-flex align-items-center">
+            {% set start_page = current_page - 2 if current_page - 2 > 1 else 1 %}
+            {% set end_page = current_page + 2 if current_page + 2 < total_pages else total_pages %}
+
+            {% if start_page > 1 %}
+                <a class="btn btn-sm btn-outline-primary" href="?range={{ current_range }}&page=1&alert={{ filter_alert }}">1</a>
+                {% if start_page > 2 %}<span class="btn btn-sm disabled">…</span>{% endif %}
+            {% endif %}
+
+            {% for p in range(start_page, end_page + 1) %}
+                <a class="btn btn-sm btn-outline-primary {% if p == current_page %}active{% endif %}" href="?range={{ current_range }}&page={{ p }}&alert={{ filter_alert }}">{{ p }}</a>
+            {% endfor %}
+
+            {% if end_page < total_pages %}
+                {% if end_page < total_pages - 1 %}<span class="btn btn-sm disabled">…</span>{% endif %}
+                <a class="btn btn-sm btn-outline-primary" href="?range={{ current_range }}&page={{ total_pages }}&alert={{ filter_alert }}">{{ total_pages }}</a>
+            {% endif %}
+
+            <!-- 跳转页码 -->
+            <form class="d-flex gap-1 ms-2 align-items-center" method="get" action="">
+                <input type="hidden" name="range" value="{{ current_range }}">
+                <input type="hidden" name="alert" value="{{ filter_alert }}">
+                <input type="number" min="1" max="{{ total_pages }}" name="page" class="form-control" style="width:70px; height:32px; padding:3px 6px;" placeholder="页码">
+                <button type="submit" class="btn btn-primary" style="height:32px;">跳转</button>
+            </form>
+        </div>
+
+        <!-- 下一页 -->
+        <div>
+            <a class="btn btn-outline-secondary {% if current_page >= total_pages %}disabled{% endif %}" href="?range={{ current_range }}&page={{ current_page + 1 }}&alert={{ filter_alert }}">下一页</a>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

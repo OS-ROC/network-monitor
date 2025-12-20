@@ -1,0 +1,58 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: network-monitor-mysql
+    environment:
+      MYSQL_DATABASE: netmon
+      MYSQL_USER: netmon_user
+      MYSQL_PASSWORD: netmon_pass
+      MYSQL_ROOT_PASSWORD: root_pass
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      retries: 10
+      timeout: 5s
+
+  scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.scheduler
+    container_name: network-monitor-scheduler
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: netmon
+      DB_USER: netmon_user
+      DB_PASSWORD: netmon_pass
+    command: ["./wait-for-mysql.sh", "mysql", "python", "backend/scheduler.py"]
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    container_name: network-monitor-web
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: netmon
+      DB_USER: netmon_user
+      DB_PASSWORD: netmon_pass
+      DISK_PATH: /host_root       # 指向宿主机根目录
+    ports:
+      - "5000:5000"
+    volumes:
+      - /:/host_root:ro           # 挂载宿主机根目录，用于磁盘信息
+      - /proc:/host_proc:ro       # 挂载宿主机 /proc，用于网络流量
+    command: [ "./wait-for-mysql.sh", "mysql", "python", "backend/app.py" ]
+
+
+volumes:
+  mysql_data:
