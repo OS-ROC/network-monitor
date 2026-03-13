@@ -110,7 +110,10 @@ cd network-monitor
 ```bash
 docker-compose up -d
 ```
-
+或者
+```bash
+docker compose up -d
+```
 这将启动以下服务：
 - `mysql`：MySQL 8.0 数据库
 - `scheduler`：定时采集服务
@@ -451,4 +454,5 @@ def get_alert(log):
 ---
 
 **注意**：本系统仅用于监控和测试目的，请勿用于生产环境的敏感数据监控。
+
 
